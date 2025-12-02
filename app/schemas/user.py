@@ -36,13 +36,13 @@ class UserCreate(UserBase):
     """Schema for user creation with password validation"""
     password: str = Field(
         min_length=8,
-        max_length=128,
+        max_length=70,
         example="SecurePass123!",
         description="User's password (8-128 characters)"
     )
     confirm_password: str = Field(
         min_length=8,
-        max_length=128,
+        max_length=70,
         example="SecurePass123!",
         description="Password confirmation"
     )
