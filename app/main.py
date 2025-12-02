@@ -19,15 +19,20 @@ from app.models.user import User
 from app.schemas.calculation import CalculationBase, CalculationResponse, CalculationUpdate
 from app.schemas.token import TokenResponse
 from app.schemas.user import UserCreate, UserResponse, UserLogin
-from app.database import Base, get_db, engine
+from app.database import Base, get_db, get_engine, get_sessionmaker
+import os
 
 
 # Create tables on startup
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Creating tables...")
+    # print("Creating tables...")
+    # Base.metadata.create_all(bind=engine)
+    # print("Tables created successfully!")
+
+    database_url = os.getenv("DATABASE_URL")  # should be test DB
+    engine = get_engine(database_url)
     Base.metadata.create_all(bind=engine)
-    print("Tables created successfully!")
     yield
 
 app = FastAPI(
