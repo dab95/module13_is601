@@ -16,6 +16,7 @@ from app.database import Base, get_engine, get_sessionmaker
 from app.models.user import User
 from app.core.config import settings
 from app.database_init import init_db, drop_db
+import os
 
 # ======================================================================================
 # Logging Configuration
@@ -32,8 +33,19 @@ logger = logging.getLogger(__name__)
 fake = Faker()
 Faker.seed(12345)
 
-test_engine = get_engine(database_url=settings.DATABASE_URL)
+test_engine = get_engine(database_url=settings.TEST_DATABASE_URL)
 TestingSessionLocal = get_sessionmaker(engine=test_engine)
+
+# Create tables in test DB
+@pytest.fixture(scope="session", autouse=True)
+def create_test_tables():
+    print("Creating tables in test database...")
+    Base.metadata.drop_all(bind=test_engine)
+    Base.metadata.create_all(bind=test_engine)
+    yield
+    Base.metadata.drop_all(bind=test_engine)
+    print("Test database tables dropped.")
+
 
 # ======================================================================================
 # Helper Functions
@@ -45,7 +57,7 @@ def create_fake_user() -> Dict[str, str]:
         "last_name": fake.last_name(),
         "email": fake.unique.email(),
         "username": fake.unique.user_name(),
-        "password": fake.password(length=12)
+        "password": fake.password(length=10)
     }
 
 @contextmanager
@@ -179,18 +191,21 @@ def fastapi_server():
 
     # Check if port is free; if not, pick an available port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        if s.connect_ex(('127.0.0.1', base_port)) == 0:
-            base_port = find_available_port()
-            server_url = f'http://127.0.0.1:{base_port}/'
+         if s.connect_ex(('127.0.0.1', base_port)) == 0:
+             base_port = find_available_port()
+             server_url = f'http://127.0.0.1:{base_port}/'
 
     logger.info(f"Starting FastAPI server on port {base_port}...")
+    env = os.environ.copy()
+    env["DATABASE_URL"] = settings.TEST_DATABASE_URL
 
     process = subprocess.Popen(
         ['uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(base_port)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        cwd='.'  # ensure the working directory is set correctly
+        cwd='.', # ensure the working directory is set correctly
+        env=env
     )
 
     # IMPORTANT: Use the /health endpoint for the check!
