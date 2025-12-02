@@ -33,18 +33,32 @@ logger = logging.getLogger(__name__)
 fake = Faker()
 Faker.seed(12345)
 
-test_engine = get_engine(database_url=settings.TEST_DATABASE_URL)
-TestingSessionLocal = get_sessionmaker(engine=test_engine)
+# Defer engine creation to fixture time so environment variables are loaded first
+test_engine = None
+TestingSessionLocal = None
 
-# Create tables in test DB
 @pytest.fixture(scope="session", autouse=True)
-def create_test_tables():
-    print("Creating tables in test database...")
+def setup_test_db():
+    """Initialize test engine and sessionmaker from environment or defaults."""
+    global test_engine, TestingSessionLocal
+    
+    # Read TEST_DATABASE_URL from environment (set by CI), or fall back to settings
+    test_db_url = os.environ.get('TEST_DATABASE_URL', settings.TEST_DATABASE_URL)
+    logger.info(f"Initializing test DB with URL: {test_db_url[:50]}...")
+    
+    test_engine = get_engine(database_url=test_db_url)
+    TestingSessionLocal = get_sessionmaker(engine=test_engine)
+    
+    # Create and drop tables
+    logger.info("Creating tables in test database...")
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
+    
     yield
+    
+    logger.info("Dropping test database tables...")
     Base.metadata.drop_all(bind=test_engine)
-    print("Test database tables dropped.")
+    logger.info("Test database tables dropped.")
 
 
 # ======================================================================================
@@ -98,28 +112,6 @@ class ServerStartupError(Exception):
 # ======================================================================================
 # Database Fixtures
 # ======================================================================================
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_database(request):
-    """
-    Set up the test database before the session starts, and tear it down after tests
-    unless --preserve-db is provided.
-    """
-    logger.info("Setting up test database...")
-    try:
-        Base.metadata.drop_all(bind=test_engine)
-        Base.metadata.create_all(bind=test_engine)
-        init_db()
-        logger.info("Test database initialized.")
-    except Exception as e:
-        logger.error(f"Error setting up test database: {str(e)}")
-        raise
-
-    yield  # Tests run after this
-
-    if not request.config.getoption("--preserve-db"):
-        logger.info("Dropping test database tables...")
-        drop_db()
-
 @pytest.fixture
 def db_session() -> Generator[Session, None, None]:
     """
