@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 import os
 
-
+# Use TEST_DATABASE_URL if in testing environment
 DATABASE_URL = os.getenv("DATABASE_URL", settings.DATABASE_URL)
 
 # Create the default engine and sessionmaker
@@ -22,7 +22,7 @@ def get_db():
     finally:
         db.close()
 
-# --- New Functions Added ---
+# Factory functions for creating engine and sessionmaker
 def get_engine(database_url: str = None):
     """Factory function to create a new SQLAlchemy engine."""
     if database_url is None:
